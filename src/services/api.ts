@@ -16,13 +16,19 @@ import type {
 } from '../types/api';
 
 const DEFAULT_API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || 'https://3.25.135.58.sslip.io/api/v1';
+  import.meta.env.VITE_API_BASE_URL || 'https://api-moneymanagement.veinestudio.my.id/api/v1';
 
 const STORAGE_TOKEN_KEY = 'mny_mngmnt_token';
 const STORAGE_API_URL_KEY = 'mny_mngmnt_api_url';
 
 export function getApiBaseUrl(): string {
-  return localStorage.getItem(STORAGE_API_URL_KEY) || DEFAULT_API_BASE_URL;
+  const saved = localStorage.getItem(STORAGE_API_URL_KEY);
+  // Migrate old sslip.io or direct EC2 URLs saved in localStorage automatically
+  if (saved && (saved.includes('sslip.io') || saved.includes('amazonaws.com'))) {
+    localStorage.removeItem(STORAGE_API_URL_KEY);
+    return DEFAULT_API_BASE_URL;
+  }
+  return saved || DEFAULT_API_BASE_URL;
 }
 
 export function setApiBaseUrl(url: string): void {
