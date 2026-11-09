@@ -15,20 +15,20 @@ import type {
   AssetType,
 } from '../types/api';
 
-const DEFAULT_API_BASE_URL =
+const PRIMARY_API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL || 'https://api-moneymanagement.veinestudio.my.id/api/v1';
+const FALLBACK_API_BASE_URL = 'https://3.25.135.58.sslip.io/api/v1';
 
 const STORAGE_TOKEN_KEY = 'mny_mngmnt_token';
 const STORAGE_API_URL_KEY = 'mny_mngmnt_api_url';
 
 export function getApiBaseUrl(): string {
   const saved = localStorage.getItem(STORAGE_API_URL_KEY);
-  // Migrate old sslip.io or direct EC2 URLs saved in localStorage automatically
-  if (saved && (saved.includes('sslip.io') || saved.includes('amazonaws.com'))) {
+  if (saved && saved.includes('amazonaws.com')) {
     localStorage.removeItem(STORAGE_API_URL_KEY);
-    return DEFAULT_API_BASE_URL;
+    return PRIMARY_API_BASE_URL;
   }
-  return saved || DEFAULT_API_BASE_URL;
+  return saved || PRIMARY_API_BASE_URL;
 }
 
 export function setApiBaseUrl(url: string): void {
@@ -64,10 +64,23 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   }
 
   const baseUrl = getApiBaseUrl();
-  const res = await fetch(`${baseUrl}${path}`, {
-    ...options,
-    headers,
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${baseUrl}${path}`, {
+      ...options,
+      headers,
+    });
+  } catch (err) {
+    // If ISP DNS still caches NXDOMAIN for the custom domain, automatically fall back to sslip.io
+    if (baseUrl !== FALLBACK_API_BASE_URL) {
+      res = await fetch(`${FALLBACK_API_BASE_URL}${path}`, {
+        ...options,
+        headers,
+      });
+    } else {
+      throw err;
+    }
+  }
 
   const data = await res.json().catch(() => ({}));
 
@@ -200,6 +213,25 @@ export const api = {
   }): Promise<Transaction> => {
     const res = await request<{ data: Transaction }>('/transactions', {
       method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    return res.data;
+  },
+
+  updateTransaction: async (
+    id: string,
+    payload: {
+      pocket_id: string;
+      related_pocket_id?: string | null;
+      category_id?: string | null;
+      type: TransactionType;
+      amount: number;
+      description?: string;
+      transaction_date?: string;
+    }
+  ): Promise<Transaction> => {
+    const res = await request<{ data: Transaction }>(`/transactions/${id}`, {
+      method: 'PUT',
       body: JSON.stringify(payload),
     });
     return res.data;
