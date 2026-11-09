@@ -8,7 +8,14 @@ import type {
   Pocket,
   PortfolioOverviewResponse,
 } from '../types/api';
-import { formatCurrency, formatDate, formatNumber, formatRateIDR, parseDecimalInput } from '../utils/format';
+import {
+  formatCurrency,
+  formatDate,
+  formatNumber,
+  formatRateIDR,
+  parseDecimalInput,
+  renderCategoryIcon,
+} from '../utils/format';
 
 export const PortfolioTab: React.FC = () => {
   const [overview, setOverview] = useState<PortfolioOverviewResponse | null>(null);
@@ -508,7 +515,7 @@ export const PortfolioTab: React.FC = () => {
                             )
                             .map((c) => (
                               <option key={c.id} value={c.id}>
-                                {c.icon} {c.name}
+                                {renderCategoryIcon(c.icon)} {c.name}
                               </option>
                             ))}
                         </select>

@@ -157,6 +157,41 @@ function App() {
         {activeTab === 'pockets' && <PocketsCategoriesTab />}
         {activeTab === 'portfolio' && <PortfolioTab />}
       </main>
+      {/* Mobile Bottom Navigation Bar */}
+      <nav className="mobile-bottom-nav">
+        <button
+          type="button"
+          className={activeTab === 'dashboard' ? 'mobile-nav-item active' : 'mobile-nav-item'}
+          onClick={() => setActiveTab('dashboard')}
+        >
+          <span className="mobile-nav-icon">📊</span>
+          <span>Dashboard</span>
+        </button>
+        <button
+          type="button"
+          className={activeTab === 'transactions' ? 'mobile-nav-item active' : 'mobile-nav-item'}
+          onClick={() => setActiveTab('transactions')}
+        >
+          <span className="mobile-nav-icon">💸</span>
+          <span>Transaksi</span>
+        </button>
+        <button
+          type="button"
+          className={activeTab === 'pockets' ? 'mobile-nav-item active' : 'mobile-nav-item'}
+          onClick={() => setActiveTab('pockets')}
+        >
+          <span className="mobile-nav-icon">👛</span>
+          <span>Kantong</span>
+        </button>
+        <button
+          type="button"
+          className={activeTab === 'portfolio' ? 'mobile-nav-item active' : 'mobile-nav-item'}
+          onClick={() => setActiveTab('portfolio')}
+        >
+          <span className="mobile-nav-icon">🌍</span>
+          <span>Valas</span>
+        </button>
+      </nav>
     </div>
   );
 }

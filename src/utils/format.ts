@@ -70,3 +70,43 @@ export function formatDateTime(dateStr: string | undefined | null): string {
     minute: '2-digit',
   }).format(d);
 }
+
+const ICON_MAP: Record<string, string> = {
+  'shopping-bag': '🛍️',
+  'shopping-cart': '🛒',
+  'dollar-sign': '💵',
+  utensils: '🍽️',
+  coffee: '☕',
+  zap: '⚡',
+  car: '🚗',
+  gift: '🎁',
+  wallet: '👛',
+  'trending-up': '📈',
+  'trending-down': '📉',
+  home: '🏠',
+  heart: '❤️',
+  briefcase: '💼',
+  'credit-card': '💳',
+  smartphone: '📱',
+  book: '📚',
+  plane: '✈️',
+  music: '🎵',
+  film: '🎬',
+  shield: '🛡️',
+  tag: '🏷️',
+};
+
+export function renderCategoryIcon(iconName: string | undefined | null): string {
+  if (!iconName) return '🏷️';
+  const key = iconName.trim().toLowerCase();
+  if (ICON_MAP[key]) {
+    return ICON_MAP[key];
+  }
+  // If already an emoji or short 1-2 char symbol, display it directly
+  if ([...iconName.trim()].length <= 2) {
+    return iconName.trim();
+  }
+  // Fallback: take first uppercase letter so it never overflows the 38px badge box
+  return iconName.trim().charAt(0).toUpperCase();
+}
+

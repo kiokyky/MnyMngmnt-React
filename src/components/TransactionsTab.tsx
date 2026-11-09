@@ -7,7 +7,7 @@ import type {
   TransactionSummaryResponse,
   TransactionType,
 } from '../types/api';
-import { formatCurrency, formatDate, parseDecimalInput } from '../utils/format';
+import { formatCurrency, formatDate, parseDecimalInput, renderCategoryIcon } from '../utils/format';
 
 export const TransactionsTab: React.FC = () => {
   const [summary, setSummary] = useState<TransactionSummaryResponse | null>(null);
@@ -265,8 +265,7 @@ export const TransactionsTab: React.FC = () => {
                   <option value="">-- Tanpa Kategori --</option>
                   {filteredCategories.map((c) => (
                     <option key={c.id} value={c.id}>
-                      {c.icon ? `${c.icon} ` : ''}
-                      {c.name}
+                      {renderCategoryIcon(c.icon)} {c.name}
                     </option>
                   ))}
                 </select>
@@ -428,8 +427,7 @@ export const TransactionsTab: React.FC = () => {
                       <td>
                         {tx.category ? (
                           <span>
-                            {tx.category.icon ? `${tx.category.icon} ` : ''}
-                            {tx.category.name}
+                            {renderCategoryIcon(tx.category.icon)} {tx.category.name}
                           </span>
                         ) : (
                           <span className="text-muted">-</span>
