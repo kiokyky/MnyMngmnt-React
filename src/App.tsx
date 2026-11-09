@@ -1,39 +1,163 @@
-import { useEffect, useState } from "react";
-import type { Schema } from "../amplify/data/resource";
-import { generateClient } from "aws-amplify/data";
+import { useEffect, useState } from 'react';
+import { AuthScreen } from './components/AuthScreen';
+import { DashboardTab } from './components/DashboardTab';
+import { TransactionsTab } from './components/TransactionsTab';
+import { PocketsCategoriesTab } from './components/PocketsCategoriesTab';
+import { PortfolioTab } from './components/PortfolioTab';
+import { api, getApiBaseUrl, getToken, setApiBaseUrl, setToken } from './services/api';
+import type { User } from './types/api';
+import './App.css';
 
-const client = generateClient<Schema>();
+type ActiveTab = 'dashboard' | 'transactions' | 'pockets' | 'portfolio';
 
 function App() {
-  const [todos, setTodos] = useState<Array<Schema["Todo"]["type"]>>([]);
+  const [user, setUser] = useState<User | null>(null);
+  const [checkingAuth, setCheckingAuth] = useState(true);
+  const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
+
+  const [showApiModal, setShowApiModal] = useState(false);
+  const [apiUrlInput, setApiUrlInput] = useState(getApiBaseUrl());
 
   useEffect(() => {
-    client.models.Todo.observeQuery().subscribe({
-      next: (data) => setTodos([...data.items]),
-    });
+    const token = getToken();
+    if (!token) {
+      setCheckingAuth(false);
+      return;
+    }
+
+    api
+      .getMe()
+      .then((u) => {
+        setUser(u);
+      })
+      .catch(() => {
+        setToken(null);
+      })
+      .finally(() => {
+        setCheckingAuth(false);
+      });
   }, []);
 
-  function createTodo() {
-    client.models.Todo.create({ content: window.prompt("Todo content") });
+  const handleLogout = () => {
+    setToken(null);
+    setUser(null);
+  };
+
+  const handleSaveApiConfig = (e: React.FormEvent) => {
+    e.preventDefault();
+    setApiBaseUrl(apiUrlInput);
+    setShowApiModal(false);
+    window.location.reload();
+  };
+
+  if (checkingAuth) {
+    return (
+      <div className="fullscreen-loader">
+        <div className="spinner" />
+        <p>Menghubungkan ke server MnyMngmnt...</p>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <AuthScreen onSuccess={(u) => setUser(u)} />;
   }
 
   return (
-    <main>
-      <h1>My todos</h1>
-      <button onClick={createTodo}>+ new</button>
-      <ul>
-        {todos.map((todo) => (
-          <li key={todo.id}>{todo.content}</li>
-        ))}
-      </ul>
-      <div>
-        🥳 App successfully hosted. Try creating a new todo.
-        <br />
-        <a href="https://docs.amplify.aws/react/start/quickstart/#make-frontend-updates">
-          Review next step of this tutorial.
-        </a>
-      </div>
-    </main>
+    <div className="app-layout">
+      {/* Top Navbar */}
+      <header className="navbar">
+        <div className="navbar-brand">
+          <span className="brand-logo-sm">💎</span>
+          <div>
+            <strong>MnyMngmnt</strong>
+            <span className="env-pill" onClick={() => setShowApiModal(true)} title="Klik untuk ubah URL API">
+              EC2 Connected ⚙️
+            </span>
+          </div>
+        </div>
+
+        <nav className="navbar-nav">
+          <button
+            type="button"
+            className={activeTab === 'dashboard' ? 'nav-item active' : 'nav-item'}
+            onClick={() => setActiveTab('dashboard')}
+          >
+            📊 Dashboard
+          </button>
+          <button
+            type="button"
+            className={activeTab === 'transactions' ? 'nav-item active' : 'nav-item'}
+            onClick={() => setActiveTab('transactions')}
+          >
+            💸 Transaksi
+          </button>
+          <button
+            type="button"
+            className={activeTab === 'pockets' ? 'nav-item active' : 'nav-item'}
+            onClick={() => setActiveTab('pockets')}
+          >
+            👛 Kantong & Kategori
+          </button>
+          <button
+            type="button"
+            className={activeTab === 'portfolio' ? 'nav-item active' : 'nav-item'}
+            onClick={() => setActiveTab('portfolio')}
+          >
+            🌍 Valas & Investasi
+          </button>
+        </nav>
+
+        <div className="navbar-user">
+          <div className="user-info">
+            <span className="user-name">{user.name}</span>
+            <span className="user-email">{user.email}</span>
+          </div>
+          <button type="button" className="btn btn-secondary btn-sm" onClick={handleLogout}>
+            Keluar
+          </button>
+        </div>
+      </header>
+
+      {/* Modal Ubah URL API */}
+      {showApiModal && (
+        <div className="modal-backdrop" onClick={() => setShowApiModal(false)}>
+          <div className="modal-box" onClick={(e) => e.stopPropagation()}>
+            <h3>Pengaturan Endpoint API EC2</h3>
+            <form onSubmit={handleSaveApiConfig} className="form-stack">
+              <div className="form-group">
+                <label>Base URL API</label>
+                <input
+                  type="text"
+                  value={apiUrlInput}
+                  onChange={(e) => setApiUrlInput(e.target.value)}
+                />
+              </div>
+              <div className="input-row">
+                <button type="submit" className="btn btn-primary">
+                  Simpan & Muat Ulang
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setShowApiModal(false)}
+                >
+                  Batal
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Main Content */}
+      <main className="main-container">
+        {activeTab === 'dashboard' && <DashboardTab onNavigate={setActiveTab} />}
+        {activeTab === 'transactions' && <TransactionsTab />}
+        {activeTab === 'pockets' && <PocketsCategoriesTab />}
+        {activeTab === 'portfolio' && <PortfolioTab />}
+      </main>
+    </div>
   );
 }
 

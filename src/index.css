@@ -1,65 +1,58 @@
-body {
+:root {
+  --bg: #0f172a;
+  --bg-card: #1e293b;
+  --bg-input: #0f172a;
+  --border: #334155;
+  --text: #f8fafc;
+  --text-muted: #94a3b8;
+  --primary: #3b82f6;
+  --primary-hover: #2563eb;
+  --success: #10b981;
+  --danger: #ef4444;
+  --warning: #f59e0b;
+  --radius: 12px;
+}
+
+* {
+  box-sizing: border-box;
   margin: 0;
-  background: linear-gradient(180deg, rgb(117, 81, 194), rgb(255, 255, 255));
-  display: flex;
-  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
-  height: 100vh;
-  width: 100vw;
-  justify-content: center;
-  align-items: center;
+  padding: 0;
 }
 
-main {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu,
+    Cantarell, sans-serif;
+  background-color: var(--bg);
+  color: var(--text);
+  line-height: 1.5;
+  min-height: 100vh;
 }
 
+input,
+select,
 button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
   font-family: inherit;
-  background-color: #1a1a1a;
-  cursor: pointer;
-  transition: border-color 0.25s;
-  color: white;
-}
-button:hover {
-  border-color: #646cff;
-}
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
+  font-size: 0.925rem;
 }
 
-ul {
-  padding-inline-start: 0;
-  margin-block-start: 0;
-  margin-block-end: 0;
-  list-style-type: none;
-  display: flex;
-  flex-direction: column;
-  margin: 8px 0;
-  border: 1px solid black;
-  gap: 1px;
-  background-color: black;
+input[type='text'],
+input[type='email'],
+input[type='password'],
+input[type='number'],
+input[type='date'],
+input[type='month'],
+select {
+  width: 100%;
+  background: var(--bg-input);
+  color: var(--text);
+  border: 1px solid var(--border);
   border-radius: 8px;
-  overflow: auto;
+  padding: 0.65rem 0.85rem;
+  outline: none;
+  transition: border-color 0.15s;
 }
 
-li {
-  background-color: white;
-  padding: 8px;
-}
-
-li:hover {
-  background: #dadbf9;
-}
-
-a {
-  font-weight: 800;
-  text-decoration: none;
+input:focus,
+select:focus {
+  border-color: var(--primary);
 }
