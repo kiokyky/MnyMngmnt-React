@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../services/api';
 import type { Category, CategoryType, Pocket, PocketType } from '../types/api';
-import { formatCurrency } from '../utils/format';
+import { formatCurrency, renderCategoryIcon } from '../utils/format';
 
 export const PocketsCategoriesTab: React.FC = () => {
   const [pockets, setPockets] = useState<Pocket[]>([]);
@@ -352,7 +352,7 @@ export const PocketsCategoriesTab: React.FC = () => {
                         className="cat-icon-badge"
                         style={{ backgroundColor: c.color || '#3b82f6' }}
                       >
-                        {c.icon || '🏷️'}
+                        {renderCategoryIcon(c.icon)}
                       </span>
                       <div>
                         <div className="item-title">{c.name}</div>

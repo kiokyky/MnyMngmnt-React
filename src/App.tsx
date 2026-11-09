@@ -6,6 +6,7 @@ import { PocketsCategoriesTab } from './components/PocketsCategoriesTab';
 import { PortfolioTab } from './components/PortfolioTab';
 import { api, getApiBaseUrl, getToken, setApiBaseUrl, setToken } from './services/api';
 import type { User } from './types/api';
+import goCuanIcon from './assets/GoCuan-icon.png';
 import './App.css';
 
 type ActiveTab = 'dashboard' | 'transactions' | 'pockets' | 'portfolio';
@@ -68,9 +69,9 @@ function App() {
       {/* Top Navbar */}
       <header className="navbar">
         <div className="navbar-brand">
-          <span className="brand-logo-sm">💎</span>
+          <img src={goCuanIcon} alt="GoCuan" className="navbar-logo-img" />
           <div>
-            <strong>MnyMngmnt</strong>
+            <strong>GoCuan</strong>
             <span className="env-pill" onClick={() => setShowApiModal(true)} title="Klik untuk ubah URL API">
               EC2 Connected ⚙️
             </span>
@@ -157,6 +158,41 @@ function App() {
         {activeTab === 'pockets' && <PocketsCategoriesTab />}
         {activeTab === 'portfolio' && <PortfolioTab />}
       </main>
+      {/* Mobile Bottom Navigation Bar */}
+      <nav className="mobile-bottom-nav">
+        <button
+          type="button"
+          className={activeTab === 'dashboard' ? 'mobile-nav-item active' : 'mobile-nav-item'}
+          onClick={() => setActiveTab('dashboard')}
+        >
+          <span className="mobile-nav-icon">📊</span>
+          <span>Dashboard</span>
+        </button>
+        <button
+          type="button"
+          className={activeTab === 'transactions' ? 'mobile-nav-item active' : 'mobile-nav-item'}
+          onClick={() => setActiveTab('transactions')}
+        >
+          <span className="mobile-nav-icon">💸</span>
+          <span>Transaksi</span>
+        </button>
+        <button
+          type="button"
+          className={activeTab === 'pockets' ? 'mobile-nav-item active' : 'mobile-nav-item'}
+          onClick={() => setActiveTab('pockets')}
+        >
+          <span className="mobile-nav-icon">👛</span>
+          <span>Kantong</span>
+        </button>
+        <button
+          type="button"
+          className={activeTab === 'portfolio' ? 'mobile-nav-item active' : 'mobile-nav-item'}
+          onClick={() => setActiveTab('portfolio')}
+        >
+          <span className="mobile-nav-icon">🌍</span>
+          <span>Valas</span>
+        </button>
+      </nav>
     </div>
   );
 }

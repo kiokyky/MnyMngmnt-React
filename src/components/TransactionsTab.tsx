@@ -1,7 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../services/api';
-import type { Category, Pocket, TransactionSummaryResponse, TransactionType } from '../types/api';
-import { formatCurrency, formatDate } from '../utils/format';
+import type {
+  Category,
+  Pocket,
+  Transaction,
+  TransactionSummaryResponse,
+  TransactionType,
+} from '../types/api';
+import { formatCurrency, formatDate, parseDecimalInput, renderCategoryIcon } from '../utils/format';
 
 export const TransactionsTab: React.FC = () => {
   const [summary, setSummary] = useState<TransactionSummaryResponse | null>(null);
@@ -17,8 +23,9 @@ export const TransactionsTab: React.FC = () => {
   const [filterStartDate, setFilterStartDate] = useState('');
   const [filterEndDate, setFilterEndDate] = useState('');
 
-  // Create Modal / Form
+  // Create / Edit Modal / Form
   const [showForm, setShowForm] = useState(false);
+  const [editingTx, setEditingTx] = useState<Transaction | null>(null);
   const [txType, setTxType] = useState<TransactionType>('expense');
   const [pocketId, setPocketId] = useState('');
   const [relatedPocketId, setRelatedPocketId] = useState('');
@@ -72,7 +79,29 @@ export const TransactionsTab: React.FC = () => {
     txType === 'transfer' ? false : c.type === txType
   );
 
-  const handleCreate = async (e: React.FormEvent) => {
+  const resetForm = () => {
+    setEditingTx(null);
+    setAmount('');
+    setDescription('');
+    setTxDate(new Date().toISOString().slice(0, 10));
+    setShowForm(false);
+  };
+
+  const startEditTx = (tx: Transaction) => {
+    setEditingTx(tx);
+    setTxType(tx.type);
+    setPocketId(tx.pocket_id);
+    setRelatedPocketId(tx.related_pocket_id || '');
+    setCategoryId(tx.category_id || '');
+    setAmount(String(Number(tx.amount)));
+    setDescription(tx.description || '');
+    setTxDate(
+      tx.transaction_date ? tx.transaction_date.slice(0, 10) : new Date().toISOString().slice(0, 10)
+    );
+    setShowForm(true);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!pocketId) {
       setError('Pilih kantong terlebih dahulu!');
@@ -83,19 +112,23 @@ export const TransactionsTab: React.FC = () => {
 
     try {
       const isoDate = txDate ? new Date(`${txDate}T12:00:00Z`).toISOString() : undefined;
-      await api.createTransaction({
+      const payload = {
         pocket_id: pocketId,
         related_pocket_id: txType === 'transfer' && relatedPocketId ? relatedPocketId : null,
         category_id: txType !== 'transfer' && categoryId ? categoryId : null,
         type: txType,
-        amount: Number(amount),
+        amount: parseDecimalInput(amount),
         description,
         transaction_date: isoDate,
-      });
+      };
 
-      setAmount('');
-      setDescription('');
-      setShowForm(false);
+      if (editingTx) {
+        await api.updateTransaction(editingTx.id, payload);
+      } else {
+        await api.createTransaction(payload);
+      }
+
+      resetForm();
       await Promise.all([loadTransactions(), loadInitialData()]);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Gagal menyimpan transaksi');
@@ -131,18 +164,34 @@ export const TransactionsTab: React.FC = () => {
             Catat pemasukan, pengeluaran, atau transfer antar kantong dengan pembaruan saldo otomatis
           </p>
         </div>
-        <button className="btn btn-primary" onClick={() => setShowForm(!showForm)}>
+        <button
+          className="btn btn-primary"
+          onClick={() => {
+            if (showForm) {
+              resetForm();
+            } else {
+              setShowForm(true);
+            }
+          }}
+        >
           {showForm ? '✕ Tutup Form' : '+ Tambah Transaksi'}
         </button>
       </div>
 
       {error && <div className="alert alert-error">{error}</div>}
 
-      {/* Form Tambah Transaksi */}
+      {/* Form Tambah / Edit Transaksi */}
       {showForm && (
         <div className="card form-card">
-          <h3>Catat Transaksi Baru</h3>
-          <form onSubmit={handleCreate} className="form-grid">
+          <div className="card-header" style={{ marginBottom: 0 }}>
+            <h3>{editingTx ? 'Edit Transaksi' : 'Catat Transaksi Baru'}</h3>
+            {editingTx && (
+              <button type="button" className="btn btn-secondary btn-sm" onClick={resetForm}>
+                Batal Edit
+              </button>
+            )}
+          </div>
+          <form onSubmit={handleSubmit} className="form-grid">
             <div className="form-group">
               <label>Jenis Transaksi</label>
               <div className="segmented-control">
@@ -216,8 +265,7 @@ export const TransactionsTab: React.FC = () => {
                   <option value="">-- Tanpa Kategori --</option>
                   {filteredCategories.map((c) => (
                     <option key={c.id} value={c.id}>
-                      {c.icon ? `${c.icon} ` : ''}
-                      {c.name}
+                      {renderCategoryIcon(c.icon)} {c.name}
                     </option>
                   ))}
                 </select>
@@ -227,9 +275,8 @@ export const TransactionsTab: React.FC = () => {
             <div className="form-group">
               <label>Nominal</label>
               <input
-                type="number"
-                step="any"
-                min="1"
+                type="text"
+                inputMode="decimal"
                 placeholder="Contoh: 150000"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
@@ -259,7 +306,11 @@ export const TransactionsTab: React.FC = () => {
 
             <div className="form-actions-full">
               <button type="submit" className="btn btn-primary" disabled={submitting}>
-                {submitting ? 'Menyimpan...' : 'Simpan Transaksi'}
+                {submitting
+                  ? 'Menyimpan...'
+                  : editingTx
+                  ? 'Simpan Perubahan'
+                  : 'Simpan Transaksi'}
               </button>
             </div>
           </form>
@@ -376,8 +427,7 @@ export const TransactionsTab: React.FC = () => {
                       <td>
                         {tx.category ? (
                           <span>
-                            {tx.category.icon ? `${tx.category.icon} ` : ''}
-                            {tx.category.name}
+                            {renderCategoryIcon(tx.category.icon)} {tx.category.name}
                           </span>
                         ) : (
                           <span className="text-muted">-</span>
@@ -397,14 +447,24 @@ export const TransactionsTab: React.FC = () => {
                         {formatCurrency(tx.amount, pocketCurrency)}
                       </td>
                       <td>
-                        <button
-                          type="button"
-                          className="btn-icon btn-danger-ghost"
-                          onClick={() => handleDelete(tx.id)}
-                          title="Hapus & Kembalikan Saldo"
-                        >
-                          🗑️
-                        </button>
+                        <div className="action-buttons">
+                          <button
+                            type="button"
+                            className="btn-icon"
+                            onClick={() => startEditTx(tx)}
+                            title="Edit Transaksi"
+                          >
+                            ✏️
+                          </button>
+                          <button
+                            type="button"
+                            className="btn-icon btn-danger-ghost"
+                            onClick={() => handleDelete(tx.id)}
+                            title="Hapus & Kembalikan Saldo"
+                          >
+                            🗑️
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -417,4 +477,3 @@ export const TransactionsTab: React.FC = () => {
     </div>
   );
 };
-

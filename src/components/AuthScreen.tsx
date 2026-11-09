@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { api, getApiBaseUrl, setApiBaseUrl, setToken } from '../services/api';
 import type { User } from '../types/api';
+import goCuanLogo from '../assets/GoCuan.png';
 
 interface AuthScreenProps {
   onSuccess: (user: User) => void;
@@ -58,11 +59,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onSuccess }) => {
     <div className="auth-wrapper">
       <div className="auth-card">
         <div className="auth-brand">
-          <div className="brand-logo">💎</div>
-          <div>
-            <h1>MnyMngmnt</h1>
-            <p>Personal Finance, Multi-Pocket & Valas Tracker</p>
-          </div>
+          <img src={goCuanLogo} alt="GoCuan Logo" className="auth-logo-img" />
         </div>
 
         <div className="auth-tabs">

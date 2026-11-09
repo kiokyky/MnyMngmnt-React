@@ -8,7 +8,14 @@ import type {
   Pocket,
   PortfolioOverviewResponse,
 } from '../types/api';
-import { formatCurrency, formatDate, formatNumber } from '../utils/format';
+import {
+  formatCurrency,
+  formatDate,
+  formatNumber,
+  formatRateIDR,
+  parseDecimalInput,
+  renderCategoryIcon,
+} from '../utils/format';
 
 export const PortfolioTab: React.FC = () => {
   const [overview, setOverview] = useState<PortfolioOverviewResponse | null>(null);
@@ -31,13 +38,15 @@ export const PortfolioTab: React.FC = () => {
   const [simRate, setSimRate] = useState('');
   const [actionMode, setActionMode] = useState<'none' | 'buy' | 'sell' | 'rate'>('none');
 
-  // Buy / Sell Form
+  // Buy / Sell / Edit Form
+  const [editingTx, setEditingTx] = useState<AssetTransaction | null>(null);
   const [pocketId, setPocketId] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [units, setUnits] = useState('');
   const [rateIdr, setRateIdr] = useState('');
   const [feeIdr, setFeeIdr] = useState('0');
   const [notes, setNotes] = useState('');
+  const [txDate, setTxDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [submitting, setSubmitting] = useState(false);
 
   const loadPortfolio = async () => {
@@ -86,7 +95,7 @@ export const PortfolioTab: React.FC = () => {
         asset_type: assetType,
         symbol: symbol.toUpperCase(),
         name,
-        current_rate_idr: Number(currentRate || 0),
+        current_rate_idr: parseDecimalInput(currentRate),
         create_pocket: createPocket,
       });
       setName('');
@@ -107,25 +116,37 @@ export const PortfolioTab: React.FC = () => {
     setError('');
 
     try {
-      if (actionMode === 'buy') {
+      const isoDate = txDate ? new Date(`${txDate}T12:00:00Z`).toISOString() : undefined;
+      if (editingTx) {
+        await api.updateAssetTransaction(selectedHolding.holding.id, editingTx.id, {
+          units: parseDecimalInput(units),
+          rate_idr: parseDecimalInput(rateIdr),
+          fee_idr: parseDecimalInput(feeIdr),
+          notes,
+          transaction_date: isoDate,
+        });
+      } else if (actionMode === 'buy') {
         await api.buyHolding(selectedHolding.holding.id, {
           source_pocket_id: pocketId || null,
           category_id: categoryId || null,
-          units: Number(units),
-          rate_idr: Number(rateIdr),
-          fee_idr: Number(feeIdr || 0),
+          units: parseDecimalInput(units),
+          rate_idr: parseDecimalInput(rateIdr),
+          fee_idr: parseDecimalInput(feeIdr),
           notes,
+          transaction_date: isoDate,
         });
       } else if (actionMode === 'sell') {
         await api.sellHolding(selectedHolding.holding.id, {
           target_pocket_id: pocketId || null,
           category_id: categoryId || null,
-          units: Number(units),
-          rate_idr: Number(rateIdr),
-          fee_idr: Number(feeIdr || 0),
+          units: parseDecimalInput(units),
+          rate_idr: parseDecimalInput(rateIdr),
+          fee_idr: parseDecimalInput(feeIdr),
           notes,
+          transaction_date: isoDate,
         });
       }
+      setEditingTx(null);
       setUnits('');
       setNotes('');
       setActionMode('none');
@@ -137,12 +158,35 @@ export const PortfolioTab: React.FC = () => {
     }
   };
 
+  const startEditAssetTx = (tx: AssetTransaction) => {
+    setEditingTx(tx);
+    setActionMode(tx.type === 'BUY' ? 'buy' : 'sell');
+    setUnits(String(Number(tx.units)));
+    setRateIdr(String(Number(tx.rate_idr)));
+    setFeeIdr(String(Number(tx.fee_idr || 0)));
+    setNotes(tx.notes || '');
+    setTxDate(tx.transaction_date ? tx.transaction_date.slice(0, 10) : new Date().toISOString().slice(0, 10));
+  };
+
+  const handleDeleteAssetTx = async (txId: string) => {
+    if (!selectedHolding) return;
+    if (!window.confirm('Hapus transaksi valas/aset ini? Saldo unit dan rata-rata kurs akan dihitung ulang otomatis.')) {
+      return;
+    }
+    try {
+      await api.deleteAssetTransaction(selectedHolding.holding.id, txId);
+      await Promise.all([loadPortfolio(), openHoldingDetail(selectedHolding.holding.id)]);
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Gagal menghapus transaksi aset');
+    }
+  };
+
   const handleUpdateRate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedHolding) return;
     setSubmitting(true);
     try {
-      await api.updateHoldingRate(selectedHolding.holding.id, Number(simRate));
+      await api.updateHoldingRate(selectedHolding.holding.id, parseDecimalInput(simRate));
       setActionMode('none');
       await Promise.all([loadPortfolio(), openHoldingDetail(selectedHolding.holding.id)]);
     } catch (err: unknown) {
@@ -218,9 +262,9 @@ export const PortfolioTab: React.FC = () => {
             <div className="form-group">
               <label>Kurs / Harga Pasar Saat Ini (IDR)</label>
               <input
-                type="number"
-                step="any"
-                placeholder="Contoh: 15850"
+                type="text"
+                inputMode="decimal"
+                placeholder="Contoh: 115,33 atau 15850"
                 value={currentRate}
                 onChange={(e) => setCurrentRate(e.target.value)}
               />
@@ -312,11 +356,11 @@ export const PortfolioTab: React.FC = () => {
                     <div className="holding-metrics">
                       <div>
                         <span className="meta-label">Avg Kurs Beli</span>
-                        <strong>{formatCurrency(item.holding.average_buy_rate_idr)}</strong>
+                        <strong>{formatRateIDR(item.holding.average_buy_rate_idr)}</strong>
                       </div>
                       <div>
                         <span className="meta-label">Kurs Pasar</span>
-                        <strong>{formatCurrency(item.current_rate_idr)}</strong>
+                        <strong>{formatRateIDR(item.current_rate_idr)}</strong>
                       </div>
                       <div>
                         <span className="meta-label">Modal IDR</span>
@@ -366,17 +410,17 @@ export const PortfolioTab: React.FC = () => {
               <label>Simulasi / Update Kurs Pasar Saat Ini (IDR per {selectedHolding.holding.symbol})</label>
               <div className="input-row">
                 <input
-                  type="number"
-                  step="any"
+                  type="text"
+                  inputMode="decimal"
                   value={simRate}
                   onChange={(e) => setSimRate(e.target.value)}
-                  placeholder="Masukkan kurs..."
+                  placeholder="Contoh: 115,33"
                 />
                 <button
                   type="button"
                   className="btn btn-secondary"
                   onClick={() =>
-                    openHoldingDetail(selectedHolding.holding.id, Number(simRate || 0))
+                    openHoldingDetail(selectedHolding.holding.id, parseDecimalInput(simRate))
                   }
                 >
                   🔍 Simulasikan
@@ -396,9 +440,10 @@ export const PortfolioTab: React.FC = () => {
             <div className="action-bar">
               <button
                 type="button"
-                className={`btn ${actionMode === 'buy' ? 'btn-primary' : 'btn-secondary'}`}
+                className={`btn ${actionMode === 'buy' && !editingTx ? 'btn-primary' : 'btn-secondary'}`}
                 onClick={() => {
-                  setActionMode(actionMode === 'buy' ? 'none' : 'buy');
+                  setEditingTx(null);
+                  setActionMode(actionMode === 'buy' && !editingTx ? 'none' : 'buy');
                   setRateIdr(String(Number(selectedHolding.current_rate_idr || 0)));
                 }}
               >
@@ -406,9 +451,10 @@ export const PortfolioTab: React.FC = () => {
               </button>
               <button
                 type="button"
-                className={`btn ${actionMode === 'sell' ? 'btn-primary' : 'btn-secondary'}`}
+                className={`btn ${actionMode === 'sell' && !editingTx ? 'btn-primary' : 'btn-secondary'}`}
                 onClick={() => {
-                  setActionMode(actionMode === 'sell' ? 'none' : 'sell');
+                  setEditingTx(null);
+                  setActionMode(actionMode === 'sell' && !editingTx ? 'none' : 'sell');
                   setRateIdr(String(Number(selectedHolding.current_rate_idr || 0)));
                 }}
               >
@@ -418,53 +464,72 @@ export const PortfolioTab: React.FC = () => {
 
             {(actionMode === 'buy' || actionMode === 'sell') && (
               <form onSubmit={handleBuyOrSell} className="subform-box">
-                <h4>
-                  {actionMode === 'buy'
-                    ? `Beli ${selectedHolding.holding.symbol} (Tambah Unit)`
-                    : `Jual ${selectedHolding.holding.symbol} (Cairkan ke IDR)`}
-                </h4>
-
-                <div className="form-group">
-                  <label>
-                    {actionMode === 'buy'
-                      ? 'Potong Saldo dari Kantong IDR (Opsional)'
-                      : 'Masukkan Hasil Pencairan ke Kantong IDR (Opsional)'}
-                  </label>
-                  <select value={pocketId} onChange={(e) => setPocketId(e.target.value)}>
-                    <option value="">-- Jangan Potong / Tambah Kantong IDR --</option>
-                    {idrPockets.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name} ({formatCurrency(p.balance, p.currency)})
-                      </option>
-                    ))}
-                  </select>
+                <div className="card-header" style={{ marginBottom: 0 }}>
+                  <h4>
+                    {editingTx
+                      ? `Edit Transaksi ${editingTx.type} ${selectedHolding.holding.symbol}`
+                      : actionMode === 'buy'
+                      ? `Beli ${selectedHolding.holding.symbol} (Tambah Unit)`
+                      : `Jual ${selectedHolding.holding.symbol} (Cairkan ke IDR)`}
+                  </h4>
+                  {editingTx && (
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => {
+                        setEditingTx(null);
+                        setActionMode('none');
+                      }}
+                    >
+                      Batal Edit
+                    </button>
+                  )}
                 </div>
 
-                {pocketId && (
-                  <div className="form-group">
-                    <label>Kategori Transaksi Kas (Opsional)</label>
-                    <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
-                      <option value="">-- Otomatis / Tanpa Kategori --</option>
-                      {categories
-                        .filter((c) =>
-                          actionMode === 'buy' ? c.type === 'expense' : c.type === 'income'
-                        )
-                        .map((c) => (
-                          <option key={c.id} value={c.id}>
-                            {c.icon} {c.name}
+                {!editingTx && (
+                  <>
+                    <div className="form-group">
+                      <label>
+                        {actionMode === 'buy'
+                          ? 'Potong Saldo dari Kantong IDR (Opsional)'
+                          : 'Masukkan Hasil Pencairan ke Kantong IDR (Opsional)'}
+                      </label>
+                      <select value={pocketId} onChange={(e) => setPocketId(e.target.value)}>
+                        <option value="">-- Jangan Potong / Tambah Kantong IDR --</option>
+                        {idrPockets.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.name} ({formatCurrency(p.balance, p.currency)})
                           </option>
                         ))}
-                    </select>
-                  </div>
+                      </select>
+                    </div>
+
+                    {pocketId && (
+                      <div className="form-group">
+                        <label>Kategori Transaksi Kas (Opsional)</label>
+                        <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
+                          <option value="">-- Otomatis / Tanpa Kategori --</option>
+                          {categories
+                            .filter((c) =>
+                              actionMode === 'buy' ? c.type === 'expense' : c.type === 'income'
+                            )
+                            .map((c) => (
+                              <option key={c.id} value={c.id}>
+                                {renderCategoryIcon(c.icon)} {c.name}
+                              </option>
+                            ))}
+                        </select>
+                      </div>
+                    )}
+                  </>
                 )}
 
                 <div className="input-row-2">
                   <div className="form-group">
                     <label>Jumlah Unit ({selectedHolding.holding.symbol})</label>
                     <input
-                      type="number"
-                      step="any"
-                      min="0.000001"
+                      type="text"
+                      inputMode="decimal"
                       placeholder="Contoh: 100"
                       value={units}
                       onChange={(e) => setUnits(e.target.value)}
@@ -475,10 +540,9 @@ export const PortfolioTab: React.FC = () => {
                   <div className="form-group">
                     <label>Kurs Transaksi (IDR / Unit)</label>
                     <input
-                      type="number"
-                      step="any"
-                      min="1"
-                      placeholder="Contoh: 15750"
+                      type="text"
+                      inputMode="decimal"
+                      placeholder="Contoh: 115,33 atau 15750"
                       value={rateIdr}
                       onChange={(e) => setRateIdr(e.target.value)}
                       required
@@ -486,15 +550,23 @@ export const PortfolioTab: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="input-row-2">
+                <div className="input-row-3">
                   <div className="form-group">
                     <label>Biaya Admin / Fee (IDR)</label>
                     <input
-                      type="number"
-                      step="any"
-                      min="0"
+                      type="text"
+                      inputMode="decimal"
                       value={feeIdr}
                       onChange={(e) => setFeeIdr(e.target.value)}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Tanggal</label>
+                    <input
+                      type="date"
+                      value={txDate}
+                      onChange={(e) => setTxDate(e.target.value)}
+                      required
                     />
                   </div>
                   <div className="form-group">
@@ -513,8 +585,10 @@ export const PortfolioTab: React.FC = () => {
                     Estimasi Total Rupiah:{' '}
                     <strong>
                       {formatCurrency(
-                        Number(units) * Number(rateIdr) +
-                          (actionMode === 'buy' ? Number(feeIdr || 0) : -Number(feeIdr || 0))
+                        parseDecimalInput(units) * parseDecimalInput(rateIdr) +
+                          (actionMode === 'buy'
+                            ? parseDecimalInput(feeIdr)
+                            : -parseDecimalInput(feeIdr))
                       )}
                     </strong>
                   </div>
@@ -523,6 +597,8 @@ export const PortfolioTab: React.FC = () => {
                 <button type="submit" className="btn btn-primary btn-block" disabled={submitting}>
                   {submitting
                     ? 'Memproses...'
+                    : editingTx
+                    ? 'Simpan Perubahan Transaksi'
                     : actionMode === 'buy'
                     ? 'Konfirmasi Pembelian'
                     : 'Konfirmasi Penjualan'}
@@ -547,6 +623,7 @@ export const PortfolioTab: React.FC = () => {
                         <th>Total (IDR)</th>
                         <th>Realized P&L</th>
                         <th>Catatan</th>
+                        <th>Aksi</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -565,7 +642,7 @@ export const PortfolioTab: React.FC = () => {
                           <td>
                             {formatNumber(h.units, 4)} {selectedHolding.holding.symbol}
                           </td>
-                          <td>{formatCurrency(h.rate_idr)}</td>
+                          <td>{formatRateIDR(h.rate_idr)}</td>
                           <td>{formatCurrency(h.total_idr)}</td>
                           <td
                             className={
@@ -579,6 +656,26 @@ export const PortfolioTab: React.FC = () => {
                             {h.type === 'SELL' ? formatCurrency(h.realized_pnl_idr) : '-'}
                           </td>
                           <td>{h.notes || '-'}</td>
+                          <td>
+                            <div className="action-buttons">
+                              <button
+                                type="button"
+                                className="btn-icon"
+                                onClick={() => startEditAssetTx(h)}
+                                title="Edit Transaksi Valas"
+                              >
+                                ✏️
+                              </button>
+                              <button
+                                type="button"
+                                className="btn-icon btn-danger-ghost"
+                                onClick={() => handleDeleteAssetTx(h.id)}
+                                title="Hapus Transaksi Valas"
+                              >
+                                🗑️
+                              </button>
+                            </div>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
