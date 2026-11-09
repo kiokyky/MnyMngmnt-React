@@ -30,6 +30,22 @@
   font-size: 1.5rem;
 }
 
+.navbar-logo-img {
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+  display: block;
+}
+
+.auth-logo-img {
+  width: 170px;
+  max-width: 75%;
+  height: auto;
+  display: block;
+  margin: 0 auto;
+  filter: drop-shadow(0 4px 16px rgba(59, 130, 246, 0.25));
+}
+
 .env-pill {
   display: inline-block;
   margin-left: 0.6rem;
@@ -149,8 +165,8 @@
 .auth-brand {
   display: flex;
   align-items: center;
-  gap: 0.9rem;
-  margin-bottom: 1.5rem;
+  justify-content: center;
+  margin-bottom: 1.35rem;
 }
 
 .brand-logo {

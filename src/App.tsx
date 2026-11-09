@@ -6,6 +6,7 @@ import { PocketsCategoriesTab } from './components/PocketsCategoriesTab';
 import { PortfolioTab } from './components/PortfolioTab';
 import { api, getApiBaseUrl, getToken, setApiBaseUrl, setToken } from './services/api';
 import type { User } from './types/api';
+import goCuanIcon from './assets/GoCuan-icon.png';
 import './App.css';
 
 type ActiveTab = 'dashboard' | 'transactions' | 'pockets' | 'portfolio';
@@ -68,9 +69,9 @@ function App() {
       {/* Top Navbar */}
       <header className="navbar">
         <div className="navbar-brand">
-          <span className="brand-logo-sm">💎</span>
+          <img src={goCuanIcon} alt="GoCuan" className="navbar-logo-img" />
           <div>
-            <strong>MnyMngmnt</strong>
+            <strong>GoCuan</strong>
             <span className="env-pill" onClick={() => setShowApiModal(true)} title="Klik untuk ubah URL API">
               EC2 Connected ⚙️
             </span>
