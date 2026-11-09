@@ -31,13 +31,15 @@ export const PortfolioTab: React.FC = () => {
   const [simRate, setSimRate] = useState('');
   const [actionMode, setActionMode] = useState<'none' | 'buy' | 'sell' | 'rate'>('none');
 
-  // Buy / Sell Form
+  // Buy / Sell / Edit Form
+  const [editingTx, setEditingTx] = useState<AssetTransaction | null>(null);
   const [pocketId, setPocketId] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [units, setUnits] = useState('');
   const [rateIdr, setRateIdr] = useState('');
   const [feeIdr, setFeeIdr] = useState('0');
   const [notes, setNotes] = useState('');
+  const [txDate, setTxDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [submitting, setSubmitting] = useState(false);
 
   const loadPortfolio = async () => {
@@ -107,7 +109,16 @@ export const PortfolioTab: React.FC = () => {
     setError('');
 
     try {
-      if (actionMode === 'buy') {
+      const isoDate = txDate ? new Date(`${txDate}T12:00:00Z`).toISOString() : undefined;
+      if (editingTx) {
+        await api.updateAssetTransaction(selectedHolding.holding.id, editingTx.id, {
+          units: parseDecimalInput(units),
+          rate_idr: parseDecimalInput(rateIdr),
+          fee_idr: parseDecimalInput(feeIdr),
+          notes,
+          transaction_date: isoDate,
+        });
+      } else if (actionMode === 'buy') {
         await api.buyHolding(selectedHolding.holding.id, {
           source_pocket_id: pocketId || null,
           category_id: categoryId || null,
@@ -115,6 +126,7 @@ export const PortfolioTab: React.FC = () => {
           rate_idr: parseDecimalInput(rateIdr),
           fee_idr: parseDecimalInput(feeIdr),
           notes,
+          transaction_date: isoDate,
         });
       } else if (actionMode === 'sell') {
         await api.sellHolding(selectedHolding.holding.id, {
@@ -124,8 +136,10 @@ export const PortfolioTab: React.FC = () => {
           rate_idr: parseDecimalInput(rateIdr),
           fee_idr: parseDecimalInput(feeIdr),
           notes,
+          transaction_date: isoDate,
         });
       }
+      setEditingTx(null);
       setUnits('');
       setNotes('');
       setActionMode('none');
@@ -134,6 +148,29 @@ export const PortfolioTab: React.FC = () => {
       setError(err instanceof Error ? err.message : 'Gagal memproses transaksi aset');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const startEditAssetTx = (tx: AssetTransaction) => {
+    setEditingTx(tx);
+    setActionMode(tx.type === 'BUY' ? 'buy' : 'sell');
+    setUnits(String(Number(tx.units)));
+    setRateIdr(String(Number(tx.rate_idr)));
+    setFeeIdr(String(Number(tx.fee_idr || 0)));
+    setNotes(tx.notes || '');
+    setTxDate(tx.transaction_date ? tx.transaction_date.slice(0, 10) : new Date().toISOString().slice(0, 10));
+  };
+
+  const handleDeleteAssetTx = async (txId: string) => {
+    if (!selectedHolding) return;
+    if (!window.confirm('Hapus transaksi valas/aset ini? Saldo unit dan rata-rata kurs akan dihitung ulang otomatis.')) {
+      return;
+    }
+    try {
+      await api.deleteAssetTransaction(selectedHolding.holding.id, txId);
+      await Promise.all([loadPortfolio(), openHoldingDetail(selectedHolding.holding.id)]);
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Gagal menghapus transaksi aset');
     }
   };
 
@@ -396,9 +433,10 @@ export const PortfolioTab: React.FC = () => {
             <div className="action-bar">
               <button
                 type="button"
-                className={`btn ${actionMode === 'buy' ? 'btn-primary' : 'btn-secondary'}`}
+                className={`btn ${actionMode === 'buy' && !editingTx ? 'btn-primary' : 'btn-secondary'}`}
                 onClick={() => {
-                  setActionMode(actionMode === 'buy' ? 'none' : 'buy');
+                  setEditingTx(null);
+                  setActionMode(actionMode === 'buy' && !editingTx ? 'none' : 'buy');
                   setRateIdr(String(Number(selectedHolding.current_rate_idr || 0)));
                 }}
               >
@@ -406,9 +444,10 @@ export const PortfolioTab: React.FC = () => {
               </button>
               <button
                 type="button"
-                className={`btn ${actionMode === 'sell' ? 'btn-primary' : 'btn-secondary'}`}
+                className={`btn ${actionMode === 'sell' && !editingTx ? 'btn-primary' : 'btn-secondary'}`}
                 onClick={() => {
-                  setActionMode(actionMode === 'sell' ? 'none' : 'sell');
+                  setEditingTx(null);
+                  setActionMode(actionMode === 'sell' && !editingTx ? 'none' : 'sell');
                   setRateIdr(String(Number(selectedHolding.current_rate_idr || 0)));
                 }}
               >
@@ -418,44 +457,64 @@ export const PortfolioTab: React.FC = () => {
 
             {(actionMode === 'buy' || actionMode === 'sell') && (
               <form onSubmit={handleBuyOrSell} className="subform-box">
-                <h4>
-                  {actionMode === 'buy'
-                    ? `Beli ${selectedHolding.holding.symbol} (Tambah Unit)`
-                    : `Jual ${selectedHolding.holding.symbol} (Cairkan ke IDR)`}
-                </h4>
-
-                <div className="form-group">
-                  <label>
-                    {actionMode === 'buy'
-                      ? 'Potong Saldo dari Kantong IDR (Opsional)'
-                      : 'Masukkan Hasil Pencairan ke Kantong IDR (Opsional)'}
-                  </label>
-                  <select value={pocketId} onChange={(e) => setPocketId(e.target.value)}>
-                    <option value="">-- Jangan Potong / Tambah Kantong IDR --</option>
-                    {idrPockets.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name} ({formatCurrency(p.balance, p.currency)})
-                      </option>
-                    ))}
-                  </select>
+                <div className="card-header" style={{ marginBottom: 0 }}>
+                  <h4>
+                    {editingTx
+                      ? `Edit Transaksi ${editingTx.type} ${selectedHolding.holding.symbol}`
+                      : actionMode === 'buy'
+                      ? `Beli ${selectedHolding.holding.symbol} (Tambah Unit)`
+                      : `Jual ${selectedHolding.holding.symbol} (Cairkan ke IDR)`}
+                  </h4>
+                  {editingTx && (
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => {
+                        setEditingTx(null);
+                        setActionMode('none');
+                      }}
+                    >
+                      Batal Edit
+                    </button>
+                  )}
                 </div>
 
-                {pocketId && (
-                  <div className="form-group">
-                    <label>Kategori Transaksi Kas (Opsional)</label>
-                    <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
-                      <option value="">-- Otomatis / Tanpa Kategori --</option>
-                      {categories
-                        .filter((c) =>
-                          actionMode === 'buy' ? c.type === 'expense' : c.type === 'income'
-                        )
-                        .map((c) => (
-                          <option key={c.id} value={c.id}>
-                            {c.icon} {c.name}
+                {!editingTx && (
+                  <>
+                    <div className="form-group">
+                      <label>
+                        {actionMode === 'buy'
+                          ? 'Potong Saldo dari Kantong IDR (Opsional)'
+                          : 'Masukkan Hasil Pencairan ke Kantong IDR (Opsional)'}
+                      </label>
+                      <select value={pocketId} onChange={(e) => setPocketId(e.target.value)}>
+                        <option value="">-- Jangan Potong / Tambah Kantong IDR --</option>
+                        {idrPockets.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.name} ({formatCurrency(p.balance, p.currency)})
                           </option>
                         ))}
-                    </select>
-                  </div>
+                      </select>
+                    </div>
+
+                    {pocketId && (
+                      <div className="form-group">
+                        <label>Kategori Transaksi Kas (Opsional)</label>
+                        <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
+                          <option value="">-- Otomatis / Tanpa Kategori --</option>
+                          {categories
+                            .filter((c) =>
+                              actionMode === 'buy' ? c.type === 'expense' : c.type === 'income'
+                            )
+                            .map((c) => (
+                              <option key={c.id} value={c.id}>
+                                {c.icon} {c.name}
+                              </option>
+                            ))}
+                        </select>
+                      </div>
+                    )}
+                  </>
                 )}
 
                 <div className="input-row-2">
@@ -484,7 +543,7 @@ export const PortfolioTab: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="input-row-2">
+                <div className="input-row-3">
                   <div className="form-group">
                     <label>Biaya Admin / Fee (IDR)</label>
                     <input
@@ -492,6 +551,15 @@ export const PortfolioTab: React.FC = () => {
                       inputMode="decimal"
                       value={feeIdr}
                       onChange={(e) => setFeeIdr(e.target.value)}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Tanggal</label>
+                    <input
+                      type="date"
+                      value={txDate}
+                      onChange={(e) => setTxDate(e.target.value)}
+                      required
                     />
                   </div>
                   <div className="form-group">
@@ -522,6 +590,8 @@ export const PortfolioTab: React.FC = () => {
                 <button type="submit" className="btn btn-primary btn-block" disabled={submitting}>
                   {submitting
                     ? 'Memproses...'
+                    : editingTx
+                    ? 'Simpan Perubahan Transaksi'
                     : actionMode === 'buy'
                     ? 'Konfirmasi Pembelian'
                     : 'Konfirmasi Penjualan'}
@@ -546,6 +616,7 @@ export const PortfolioTab: React.FC = () => {
                         <th>Total (IDR)</th>
                         <th>Realized P&L</th>
                         <th>Catatan</th>
+                        <th>Aksi</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -578,6 +649,26 @@ export const PortfolioTab: React.FC = () => {
                             {h.type === 'SELL' ? formatCurrency(h.realized_pnl_idr) : '-'}
                           </td>
                           <td>{h.notes || '-'}</td>
+                          <td>
+                            <div className="action-buttons">
+                              <button
+                                type="button"
+                                className="btn-icon"
+                                onClick={() => startEditAssetTx(h)}
+                                title="Edit Transaksi Valas"
+                              >
+                                ✏️
+                              </button>
+                              <button
+                                type="button"
+                                className="btn-icon btn-danger-ghost"
+                                onClick={() => handleDeleteAssetTx(h.id)}
+                                title="Hapus Transaksi Valas"
+                              >
+                                🗑️
+                              </button>
+                            </div>
+                          </td>
                         </tr>
                       ))}
                     </tbody>

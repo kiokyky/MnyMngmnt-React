@@ -277,4 +277,31 @@ export const api = {
       method: 'PATCH',
       body: JSON.stringify({ current_rate_idr }),
     }),
+
+  updateAssetTransaction: (
+    holdingId: string,
+    txId: string,
+    payload: {
+      units: number;
+      rate_idr: number;
+      fee_idr?: number;
+      notes?: string;
+      transaction_date?: string;
+    }
+  ) =>
+    request<{ message: string; summary: HoldingMarginView; transaction: AssetTransaction }>(
+      `/portfolio/holdings/${holdingId}/transactions/${txId}`,
+      {
+        method: 'PUT',
+        body: JSON.stringify(payload),
+      }
+    ),
+
+  deleteAssetTransaction: (holdingId: string, txId: string) =>
+    request<{ message: string; summary: HoldingMarginView }>(
+      `/portfolio/holdings/${holdingId}/transactions/${txId}`,
+      {
+        method: 'DELETE',
+      }
+    ),
 };
