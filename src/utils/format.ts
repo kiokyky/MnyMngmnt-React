@@ -1,13 +1,28 @@
-export function formatCurrency(value: string | number | undefined | null, currency = 'IDR'): string {
+export function parseDecimalInput(val: string | number): number {
+  if (typeof val === 'number') return val;
+  if (!val) return 0;
+  // Support both comma and dot as decimal separator if user types "115,33"
+  const normalized = val.trim().replace(',', '.');
+  const parsed = Number(normalized);
+  return isNaN(parsed) ? 0 : parsed;
+}
+
+export function formatCurrency(
+  value: string | number | undefined | null,
+  currency = 'IDR',
+  maxDecimals = 2
+): string {
   const num = Number(value || 0);
   if (isNaN(num)) return `${currency} 0`;
+
+  const hasFraction = Math.abs(num % 1) > 0.00001;
 
   if (currency.toUpperCase() === 'IDR') {
     return new Intl.NumberFormat('id-ID', {
       style: 'currency',
       currency: 'IDR',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
+      minimumFractionDigits: hasFraction ? 2 : 0,
+      maximumFractionDigits: hasFraction ? Math.max(2, maxDecimals) : 0,
     }).format(num);
   }
 
@@ -17,6 +32,10 @@ export function formatCurrency(value: string | number | undefined | null, curren
     minimumFractionDigits: 2,
     maximumFractionDigits: 4,
   }).format(num);
+}
+
+export function formatRateIDR(value: string | number | undefined | null): string {
+  return formatCurrency(value, 'IDR', 4);
 }
 
 export function formatNumber(value: string | number | undefined | null, maxDecimals = 4): string {
@@ -51,4 +70,3 @@ export function formatDateTime(dateStr: string | undefined | null): string {
     minute: '2-digit',
   }).format(d);
 }
-

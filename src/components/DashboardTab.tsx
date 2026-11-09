@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../services/api';
 import type { DashboardSummaryResponse } from '../types/api';
-import { formatCurrency, formatNumber } from '../utils/format';
+import { formatCurrency, formatNumber, formatRateIDR } from '../utils/format';
 
 interface DashboardTabProps {
   onNavigate: (tab: 'dashboard' | 'transactions' | 'pockets' | 'portfolio') => void;
@@ -218,8 +218,8 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ onNavigate }) => {
                       <td>
                         {formatNumber(item.holding.total_units, 4)} {item.holding.symbol}
                       </td>
-                      <td>{formatCurrency(item.holding.average_buy_rate_idr)}</td>
-                      <td>{formatCurrency(item.current_rate_idr)}</td>
+                      <td>{formatRateIDR(item.holding.average_buy_rate_idr)}</td>
+                      <td>{formatRateIDR(item.current_rate_idr)}</td>
                       <td>{formatCurrency(item.holding.total_cost_idr)}</td>
                       <td>
                         <strong>{formatCurrency(item.market_value_idr)}</strong>
